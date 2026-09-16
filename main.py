@@ -79,6 +79,14 @@ def navigate_to_section_with_tabs(driver):
         return True
     except TimeoutException:
         print("Could not find the 'DL Pipeline' sidebar option — staying on current page.")
+        # Debug aid: dump the sidebar's actual HTML so the XPath can be
+        # corrected against the real DOM instead of guessed again.
+        try:
+            sidebar = driver.find_element(By.XPATH, "//section[@data-testid='stSidebar']")
+            print("--- Sidebar HTML snippet for debugging ---")
+            print(sidebar.get_attribute("outerHTML")[:3000])
+        except Exception as e:
+            print(f"Could not capture sidebar HTML either: {e}")
         return False
 
 
