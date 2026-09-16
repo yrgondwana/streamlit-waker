@@ -35,25 +35,30 @@ def wake_app(driver, wait):
     """Load the URL and click the sleep-screen wake button if present.
     Returns True if the app was asleep and we woke it, False if it was
     already awake."""
-    driver.get(STREAMLIT_URL)
-    print(f"Opened {STREAMLIT_URL}")
-    print(f"Page title: {driver.title}")
+    # Streamlit is a client-side rendered app behind a gateway/proxy: the
+    # first load can sometimes return a generic shell page that never
+    # finishes transitioning into the real app (seen in practice — not
+    # just a slow render). Retry a few times with a fresh reload rather
+    # than trusting a single load to eventually resolve.
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        driver.get(STREAMLIT_URL)
+        print(f"Opened {STREAMLIT_URL} (attempt {attempt}/{max_attempts})")
+        print(f"Page title: {driver.title}")
 
-    # Streamlit is a client-side rendered app: the initial HTML document
-    # can finish loading (analytics scripts, boilerplate shell) before
-    # the actual app content has mounted. Wait for either the real app
-    # container OR the sleep-screen wake button before doing anything
-    # else, so we don't mistake a still-loading page for either state.
-    try:
-        WebDriverWait(driver, 20).until(
-            lambda d: d.find_elements(By.XPATH, "//div[@data-testid='stAppViewContainer']")
-            or d.find_elements(By.XPATH, WAKE_BUTTON_XPATH)
-        )
-    except TimeoutException:
-        print("Neither the app content nor a wake button appeared in time.")
-        print("--- Page HTML snippet for debugging ---")
-        print(driver.page_source[:3000])
-        return False
+        try:
+            WebDriverWait(driver, 20).until(
+                lambda d: d.find_elements(By.XPATH, "//div[@data-testid='stAppViewContainer']")
+                or d.find_elements(By.XPATH, WAKE_BUTTON_XPATH)
+            )
+            break  # real content or wake button showed up — proceed below
+        except TimeoutException:
+            print(f"Attempt {attempt}: neither app content nor wake button appeared.")
+            if attempt == max_attempts:
+                print("--- Page HTML snippet for debugging (final attempt) ---")
+                print(driver.page_source[:3000])
+                return False
+            time.sleep(5)  # brief pause before retrying with a fresh load
 
     try:
         button = wait.until(
