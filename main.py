@@ -39,6 +39,22 @@ def wake_app(driver, wait):
     print(f"Opened {STREAMLIT_URL}")
     print(f"Page title: {driver.title}")
 
+    # Streamlit is a client-side rendered app: the initial HTML document
+    # can finish loading (analytics scripts, boilerplate shell) before
+    # the actual app content has mounted. Wait for either the real app
+    # container OR the sleep-screen wake button before doing anything
+    # else, so we don't mistake a still-loading page for either state.
+    try:
+        WebDriverWait(driver, 20).until(
+            lambda d: d.find_elements(By.XPATH, "//div[@data-testid='stAppViewContainer']")
+            or d.find_elements(By.XPATH, WAKE_BUTTON_XPATH)
+        )
+    except TimeoutException:
+        print("Neither the app content nor a wake button appeared in time.")
+        print("--- Page HTML snippet for debugging ---")
+        print(driver.page_source[:3000])
+        return False
+
     try:
         button = wait.until(
             EC.element_to_be_clickable((By.XPATH, WAKE_BUTTON_XPATH))
@@ -68,19 +84,6 @@ def navigate_to_section_with_tabs(driver):
     """The landing page ("Overview") has no tabs. Click the "DL Pipeline"
     sidebar option so the page that actually has tabs is loaded, giving
     simulate_activity() something real to interact with."""
-    try:
-        # Wait for the app's main content root to exist first. If the
-        # page is still hydrating, hunting for the sidebar immediately
-        # can fail even though it would appear moments later.
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@data-testid='stAppViewContainer']"))
-        )
-    except TimeoutException:
-        print("App view container never appeared — page may not have loaded correctly.")
-        print("--- Full page HTML snippet for debugging ---")
-        print(driver.page_source[:3000])
-        return False
-
     try:
         section = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, SIDEBAR_SECTION_XPATH))
