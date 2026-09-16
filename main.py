@@ -69,6 +69,19 @@ def navigate_to_section_with_tabs(driver):
     sidebar option so the page that actually has tabs is loaded, giving
     simulate_activity() something real to interact with."""
     try:
+        # Wait for the app's main content root to exist first. If the
+        # page is still hydrating, hunting for the sidebar immediately
+        # can fail even though it would appear moments later.
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.XPATH, "//div[@data-testid='stAppViewContainer']"))
+        )
+    except TimeoutException:
+        print("App view container never appeared — page may not have loaded correctly.")
+        print("--- Full page HTML snippet for debugging ---")
+        print(driver.page_source[:3000])
+        return False
+
+    try:
         section = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, SIDEBAR_SECTION_XPATH))
         )
@@ -79,14 +92,10 @@ def navigate_to_section_with_tabs(driver):
         return True
     except TimeoutException:
         print("Could not find the 'DL Pipeline' sidebar option — staying on current page.")
-        # Debug aid: dump the sidebar's actual HTML so the XPath can be
+        # Debug aid: dump the full page HTML so the XPath can be
         # corrected against the real DOM instead of guessed again.
-        try:
-            sidebar = driver.find_element(By.XPATH, "//section[@data-testid='stSidebar']")
-            print("--- Sidebar HTML snippet for debugging ---")
-            print(sidebar.get_attribute("outerHTML")[:3000])
-        except Exception as e:
-            print(f"Could not capture sidebar HTML either: {e}")
+        print("--- Full page HTML snippet for debugging ---")
+        print(driver.page_source[:5000])
         return False
 
 
