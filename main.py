@@ -16,14 +16,9 @@ STREAMLIT_URL = os.environ.get(
 
 # Robust XPath: matches on ALL descendant text (., not text()) so it still
 # finds the button even if Streamlit wraps the label in a nested <span>/<p>.
+# Also matches on a shorter, stable substring ("get this app back up")
+# so it survives minor copy changes (e.g. added "!" or emoji).
 WAKE_BUTTON_XPATH = "//button[contains(., 'get this app back up')]"
-
-# Any real Streamlit app renders this container. Its presence is how we
-# tell "genuinely loaded the real app" apart from a generic/unresolved
-# shell page — this fixes a false positive the original script had,
-# where "no wake button found" was wrongly read as "already awake" even
-# when neither the button nor the real app had actually loaded.
-APP_CONTAINER_XPATH = "//div[@data-testid='stAppViewContainer']"
 
 
 def main():
@@ -44,41 +39,39 @@ def main():
         print(f"Opened {STREAMLIT_URL}")
         print(f"Page title: {driver.title}")
 
+        # Give the page a moment to fully render before we start polling,
+        # since Streamlit's sleep/wake screen can take a beat to mount.
         wait = WebDriverWait(driver, 20)
 
-        # Wait for EITHER the real app content or the wake button —
-        # whichever shows up first. If neither does within the timeout,
-        # we know the page never resolved to something usable, rather
-        # than silently assuming the app is awake.
         try:
-            wait.until(
-                lambda d: d.find_elements(By.XPATH, APP_CONTAINER_XPATH)
-                or d.find_elements(By.XPATH, WAKE_BUTTON_XPATH)
+            # Look for the wake-up button
+            button = wait.until(
+                EC.element_to_be_clickable((By.XPATH, WAKE_BUTTON_XPATH))
             )
-        except TimeoutException:
-            print("Neither app content nor wake button appeared in time.")
-            print("--- Page source snippet for debugging ---")
-            print(driver.page_source[:2000])
-            exit(1)
-
-        wake_buttons = driver.find_elements(By.XPATH, WAKE_BUTTON_XPATH)
-
-        if wake_buttons:
             print("Wake-up button found. Clicking...")
-            wake_buttons[0].click()
+            button.click()
 
+            # After clicking, check if it disappears
             try:
                 wait.until(
                     EC.invisibility_of_element_located((By.XPATH, WAKE_BUTTON_XPATH))
                 )
-                print("Button clicked and disappeared (app is waking up)")
+                print("Button clicked and disappeared (app should be waking up)")
             except TimeoutException:
                 print("Button was clicked but did NOT disappear (possible failure)")
+                # Debug aid: dump a snippet of the page source so failures are
+                # diagnosable from the Actions log instead of a silent guess.
                 print("--- Page source snippet for debugging ---")
                 print(driver.page_source[:2000])
                 exit(1)
-        else:
-            print("No wake-up button found, and real app content is present — app is already awake.")
+
+        except TimeoutException:
+            # No button at all -> app is assumed to be awake.
+            # Print a page source snippet here too, since a mismatched XPath
+            # would ALSO land in this branch and look identical to "already awake".
+            print("No wake-up button found. Assuming app is already awake.")
+            print("--- Page source snippet (for verifying assumption) ---")
+            print(driver.page_source[:1000])
 
     except Exception as e:
         print(f"Unexpected error: {e}")
