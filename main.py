@@ -24,6 +24,12 @@ WAKE_BUTTON_XPATH = "//button[contains(., 'get this app back up')]"
 # doesn't need updating if tab names change later.
 TAB_XPATH = "//button[@role='tab']"
 
+# The dashboard's landing page ("Overview") has no tabs — tabs only exist
+# on the "DL Pipeline" and "Results" sidebar sections. This matches the
+# sidebar navigation label for a section that does have tabs, so the
+# waker actually has something to click once it gets there.
+SIDEBAR_SECTION_XPATH = "//label[.//div[contains(text(), 'DL Pipeline')]]"
+
 
 def wake_app(driver, wait):
     """Load the URL and click the sleep-screen wake button if present.
@@ -55,6 +61,24 @@ def wake_app(driver, wait):
 
     except TimeoutException:
         print("No wake-up button found. Assuming app is already awake.")
+        return False
+
+
+def navigate_to_section_with_tabs(driver):
+    """The landing page ("Overview") has no tabs. Click the "DL Pipeline"
+    sidebar option so the page that actually has tabs is loaded, giving
+    simulate_activity() something real to interact with."""
+    try:
+        section = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, SIDEBAR_SECTION_XPATH))
+        )
+        driver.execute_script("arguments[0].click();", section)
+        print("Clicked sidebar section: DL Pipeline")
+        # Let the section's content (including its tabs) render.
+        time.sleep(3)
+        return True
+    except TimeoutException:
+        print("Could not find the 'DL Pipeline' sidebar option — staying on current page.")
         return False
 
 
@@ -118,6 +142,7 @@ def main():
         if was_asleep:
             time.sleep(10)
 
+        navigate_to_section_with_tabs(driver)
         simulate_activity(driver, wait)
 
     except Exception as e:
