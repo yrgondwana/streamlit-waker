@@ -33,7 +33,12 @@ def main():
     # undetected-chromedriver manages its own patched driver binary, so
     # no Service/ChromeDriverManager setup is needed here — that's the
     # main structural difference from the previous script.
-    driver = uc.Chrome(options=options)
+    #
+    # version_main=None tells it to auto-detect the installed Chrome's
+    # major version and fetch a matching driver, rather than assuming
+    # whatever version it happens to bundle by default. This avoids
+    # mismatches against whatever Chrome version the CI runner installs.
+    driver = uc.Chrome(options=options, version_main=None)
 
     try:
         driver.get(STREAMLIT_URL)
