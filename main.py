@@ -8,7 +8,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import TimeoutException
 import os
 
-# Replace this with your actual Streamlit app URL
+# Replaced  with Streamlit app URL.
 STREAMLIT_URL = os.environ.get(
     "STREAMLIT_APP_URL",
     "https://potential-winterkill-dashboard.streamlit.app/"
